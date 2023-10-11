@@ -1,3 +1,4 @@
+use colored::Colorize;
 use regex::Regex;
 use std::{
     env, error, fs,
@@ -5,46 +6,70 @@ use std::{
     path::Path,
 };
 
-fn search(file_path: String, search_text: String) -> Result<(), Box<dyn error::Error>> {
-    // let current_dir = env::current_dir()?;
-    let target_dir = Path::new(&file_path);
+struct Searcher {
+    count: i32,
+}
 
-    println!("[SEARCHING]...");
+impl Searcher {
+    fn search(
+        &mut self,
+        file_path: String,
+        search_text: String,
+    ) -> Result<(), Box<dyn error::Error>> {
+        let target_dir = Path::new(&file_path);
 
-    for entry in fs::read_dir(target_dir)? {
-        let entry = entry?;
-        let path = entry.path();
+        for entry in fs::read_dir(target_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            let metadata = fs::metadata(&path)?;
 
-        let metadata = fs::metadata(&path)?;
-        let last_modified = metadata.modified()?.elapsed()?.as_secs();
+            if metadata.is_dir() {
+                let _ = self.search(path.to_str().unwrap().to_string(), search_text.clone());
+            } else {
+                let file = std::fs::File::open(path.clone())?;
+                let reader = BufReader::new(file);
+                let regex = Regex::new(&search_text).unwrap();
 
-        if metadata.is_dir() {
-            println!("Found a dir -> {}", path.to_str().unwrap().to_string());
-            let _ = search(path.to_str().unwrap().to_string(), search_text.clone());
-        } else {
-            println!(
-                "Last modified: {:?} seconds, filename: {:?}",
-                last_modified,
-                path.file_name().ok_or("No filename")?
-            );
-            let file = std::fs::File::open(path).unwrap();
-            let reader = BufReader::new(file);
+                let mut matches: Vec<String> = vec![];
 
-            let regex = Regex::new(&search_text).unwrap();
+                for line in reader.lines() {
+                    let line_clone = line?;
 
-            for line in reader.lines() {
-                let line_clone = line.unwrap();
-                if regex.is_match(&line_clone.clone()) {
-                    println!(">>>>>");
-                    println!("FOUNDOUNFOUDNOUN -> {}", search_text);
-                    println!("FULL SENTENCE -> {:?}", line_clone.clone());
-                    println!(">>>>>");
+                    if regex.is_match(&line_clone.clone()) {
+                        matches.push(line_clone.clone());
+                    }
+                }
+
+                if matches.len() > 0 {
+                    self.count += 1;
+                    println!("{}", ">>>>>".yellow());
+                    println!(
+                        "{}. {}",
+                        self.count.to_string().blue().bold(),
+                        path.file_name().unwrap().to_string_lossy().blue().bold()
+                    );
+
+                    for match_str in matches {
+                        let split_strs = match_str.split(&search_text);
+                        let split_strs_count = split_strs.clone().count();
+
+                        print!(">>> ");
+                        for (i, split_str) in split_strs.enumerate() {
+                            print!("{}", split_str.trim().green().bold());
+                            if i < split_strs_count - 1 {
+                                print!("{}", search_text.yellow().bold());
+                            }
+                        }
+                        println!("\n");
+                    }
+
+                    println!("{}", ">>>>>".yellow());
                 }
             }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 fn main() {
@@ -62,7 +87,9 @@ fn main() {
     println!("Searching for search text: [{}]", search_text);
 
     // search for the file
-    let _ = search(file_path.clone(), search_text.clone());
+    println!("{}", "[SEARCHING]...".bold().green());
+    let mut searcher = Searcher { count: 0 };
+    let _ = searcher.search(file_path.clone(), search_text.clone());
 
     dbg!();
 }
