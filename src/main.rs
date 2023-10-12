@@ -55,7 +55,7 @@ impl Searcher {
 
                         print!(">>> ");
                         for (i, split_str) in split_strs.enumerate() {
-                            print!("{}", split_str.trim().green().bold());
+                            print!("{}", split_str.green().bold());
                             if i < split_strs_count - 1 {
                                 print!("{}", search_text.yellow().bold());
                             }
