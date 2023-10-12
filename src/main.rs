@@ -6,70 +6,68 @@ use std::{
     path::Path,
 };
 
-struct Searcher {
-    count: i32,
-}
+static mut COUNT: i32 = 0;
 
-impl Searcher {
-    fn search(
-        &mut self,
-        file_path: String,
-        search_text: String,
-    ) -> Result<(), Box<dyn error::Error>> {
-        let target_dir = Path::new(&file_path);
+fn search(file_path: String, search_text: String) -> Result<(), Box<dyn error::Error>> {
+    let target_dir = Path::new(&file_path);
 
-        for entry in fs::read_dir(target_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            let metadata = fs::metadata(&path)?;
+    for entry in fs::read_dir(target_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let metadata = fs::metadata(&path)?;
 
-            if metadata.is_dir() {
-                let _ = self.search(path.to_str().unwrap().to_string(), search_text.clone());
-            } else {
-                let file = std::fs::File::open(path.clone())?;
-                let reader = BufReader::new(file);
-                let regex = Regex::new(&search_text).unwrap();
+        if metadata.is_dir() {
+            let _ = search(path.to_str().unwrap().to_string(), search_text.clone());
+        } else {
+            let file = std::fs::File::open(path.clone())?;
+            let reader = BufReader::new(file);
+            let regex = Regex::new(&search_text).unwrap();
 
-                let mut matches: Vec<String> = vec![];
+            let mut matches: Vec<String> = vec![];
 
-                for line in reader.lines() {
-                    let line_clone = line?;
+            for line in reader.lines() {
+                let line_clone = line?;
 
-                    if regex.is_match(&line_clone.clone()) {
-                        matches.push(line_clone.clone());
-                    }
-                }
-
-                if matches.len() > 0 {
-                    self.count += 1;
-                    println!("{}", ">>>>>".yellow());
-                    println!(
-                        "{}. {}",
-                        self.count.to_string().blue().bold(),
-                        path.file_name().unwrap().to_string_lossy().blue().bold()
-                    );
-
-                    for match_str in matches {
-                        let split_strs = match_str.split(&search_text);
-                        let split_strs_count = split_strs.clone().count();
-
-                        print!(">>> ");
-                        for (i, split_str) in split_strs.enumerate() {
-                            print!("{}", split_str.green().bold());
-                            if i < split_strs_count - 1 {
-                                print!("{}", search_text.yellow().bold());
-                            }
-                        }
-                        println!("\n");
-                    }
-
-                    println!("{}", ">>>>>".yellow());
+                if regex.is_match(&line_clone.clone()) {
+                    matches.push(line_clone.clone());
                 }
             }
-        }
 
-        Ok(())
+            if matches.len() > 0 {
+                unsafe { COUNT += 1 };
+                println!("{}", ">>>>>".yellow());
+
+                let count_clone;
+                unsafe {
+                    count_clone = COUNT.clone();
+                };
+
+                println!(
+                    "{}. {}",
+                    count_clone.to_string().blue().bold(),
+                    path.file_name().unwrap().to_string_lossy().blue().bold()
+                );
+
+                for match_str in matches {
+                    let split_strs = match_str.split(&search_text);
+                    let split_strs_count = split_strs.clone().count();
+
+                    print!(">>> ");
+                    for (i, split_str) in split_strs.enumerate() {
+                        print!("{}", split_str.green().bold());
+                        if i < split_strs_count - 1 {
+                            print!("{}", search_text.yellow().bold());
+                        }
+                    }
+                    println!("\n");
+                }
+
+                println!("{}", ">>>>>".yellow());
+            }
+        }
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -88,8 +86,7 @@ fn main() {
 
     // search for the file
     println!("{}", "[SEARCHING]...".bold().green());
-    let mut searcher = Searcher { count: 0 };
-    let _ = searcher.search(file_path.clone(), search_text.clone());
+    let _ = search(file_path.clone(), search_text.clone());
 
     dbg!();
 }
